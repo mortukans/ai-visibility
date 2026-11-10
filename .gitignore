@@ -1,0 +1,6 @@
+node_modules/
+data/
+results.json
+.env
+.wrangler/
+.dev.vars

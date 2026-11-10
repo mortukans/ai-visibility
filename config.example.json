@@ -1,0 +1,11 @@
+{
+  "brand": "Acme Analytics",
+  "aliases": ["Acme", "AcmeAnalytics"],
+  "domain": "acme-analytics.com",
+  "competitors": ["Mixpanel", "Amplitude", "PostHog", "Heap"],
+  "models": [
+    { "id": "perplexity/sonar", "label": "Perplexity Sonar", "grounding": "native" },
+    { "id": "openai/gpt-4o-mini", "label": "GPT-4o mini", "grounding": "online" },
+    { "id": "google/gemini-2.5-flash", "label": "Gemini 2.5 Flash", "grounding": "online" }
+  ]
+}

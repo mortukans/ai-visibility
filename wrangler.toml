@@ -1,0 +1,25 @@
+name = "ai-visibility"
+main = "src/worker.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Serve the dashboard (public/) from the same Worker. A request matching a file in
+# public/ is served as a static asset; everything else (the /v1 API) runs fetch().
+[assets]
+directory = "./public"
+
+# D1 database binding. Create it once with:
+#   wrangler d1 create ai-visibility
+# then paste the printed database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "ai-visibility"
+database_id = "e2385ab9-605f-44ca-a34b-31221fa0b75e"
+migrations_dir = "migrations"
+
+# Scheduled checks. Cron is in UTC; this runs daily at 06:00.
+[triggers]
+crons = ["0 6 * * *"]
+
+# Encrypt stored OpenRouter keys at rest. Set the secret (not committed) with:
+#   wrangler secret put KEY_SECRET

@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Visibility</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --series: #2a78d6;
+    --series-soft: #9ec5f4;
+    --good: #006300;
+    --bad: #d03b3b;
+    --border: rgba(11, 11, 11, 0.1);
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #f0efec;
+      --ink2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --series: #3987e5;
+      --series-soft: #1c5cab;
+      --good: #0ca30c;
+      --bad: #e66767;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --series: #3987e5;
+    --series-soft: #1c5cab;
+    --good: #0ca30c;
+    --bad: #e66767;
+    --border: rgba(255, 255, 255, 0.1);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--ink2); font-size: 13px; margin: 2px 0 0; }
+  .theme-btn {
+    background: var(--surface); color: var(--ink2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+  }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; margin-top: 16px;
+  }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 14px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 160px; min-width: 0; }
+  .field label { font-size: 12px; color: var(--ink2); }
+  input, textarea, select {
+    width: 100%; background: var(--page); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    font: inherit;
+  }
+  textarea { resize: vertical; min-height: 80px; }
+  button {
+    background: var(--series); color: #fff; border: 0; border-radius: 8px;
+    padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  button.ghost { background: transparent; color: var(--series); border: 1px solid var(--border); }
+  button:disabled { opacity: 0.55; cursor: default; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .hint code { background: var(--page); padding: 1px 5px; border-radius: 4px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .tile .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .tile .v { font-size: 30px; margin-top: 4px; letter-spacing: -0.02em; }
+  .tile .d { font-size: 12px; margin-top: 2px; color: var(--ink2); }
+  .up { color: var(--good); } .down { color: var(--bad); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 4px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 44px; align-items: center; gap: 10px; margin: 8px 0; }
+  .bar-row .name { font-size: 13px; color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { height: 14px; background: var(--page); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: var(--series-soft); }
+  .bar-fill.you { background: var(--series); }
+  .bar-row .val { font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink2); }
+
+  svg text { fill: var(--muted); font-size: 11px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 10px 0; }
+
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 10; background: var(--surface);
+    color: var(--ink); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 9px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    opacity: 0; transition: opacity 0.08s;
+  }
+  #toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    background: var(--ink); color: var(--page); padding: 9px 16px; border-radius: 999px;
+    font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 20;
+    max-width: 90vw;
+  }
+  #toast.show { opacity: 1; }
+  #toast.bad { background: var(--bad); color: #fff; }
+  #toast.good { background: var(--good); color: #fff; }
+
+  @media (max-width: 680px) {
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>AI Visibility</h1>
+      <p class="sub">Does your site get mentioned and cited by AI models? Track it over time.</p>
+    </div>
+    <button id="themeToggle" class="theme-btn">Theme</button>
+  </header>
+
+  <!-- 1. Connect -->
+  <section class="card">
+    <h2>1 · Connect</h2>
+    <div class="row">
+      <div class="field" style="flex: 2 1 220px;">
+        <label for="base">API base URL</label>
+        <input id="base" placeholder="same origin" />
+      </div>
+      <div class="field">
+        <label for="email">New account email</label>
+        <input id="email" type="email" placeholder="you@example.com" />
+      </div>
+      <button id="createAccount">Create account</button>
+    </div>
+    <div class="row" style="margin-top: 12px;">
+      <div class="field" style="flex: 2 1 220px;">
+        <label for="apiKey">API key</label>
+        <input id="apiKey" placeholder="av_… (created above, or paste an existing one)" />
+      </div>
+      <button id="useKey" class="ghost">Use key</button>
+    </div>
+    <div class="row" style="margin-top: 12px;">
+      <div class="field" style="flex: 2 1 220px;">
+        <label for="orKey">Your OpenRouter key (BYOK)</label>
+        <input id="orKey" type="password" placeholder="sk-or-… (stored encrypted)" />
+      </div>
+      <button id="saveOrKey" class="ghost">Save key</button>
+    </div>
+    <p class="hint">Keys never leave your account. Run the API with <code>npm run api</code>, or point the base URL at your deployed Worker.</p>
+  </section>
+
+  <!-- 2. Site -->
+  <section class="card">
+    <h2>2 · Site &amp; questions</h2>
+    <div class="row">
+      <div class="field" style="flex: 2 1 220px;">
+        <label for="sites">Your sites</label>
+        <select id="sites"><option value="">— none yet —</option></select>
+      </div>
+      <button id="reloadSites" class="ghost">Reload</button>
+    </div>
+    <div class="row" style="margin-top: 12px;">
+      <div class="field"><label for="brand">Brand</label><input id="brand" placeholder="Acme Analytics" /></div>
+      <div class="field"><label for="domain">Domain</label><input id="domain" placeholder="acme-analytics.com" /></div>
+      <div class="field" style="flex: 2 1 220px;"><label for="competitors">Competitors (comma-separated)</label><input id="competitors" placeholder="Mixpanel, Amplitude, PostHog" /></div>
+      <button id="addSite">Add site</button>
+    </div>
+    <div class="field" style="margin-top: 12px;">
+      <label for="questions">Questions to track (one per line)</label>
+      <textarea id="questions" placeholder="best product analytics tools for startups&#10;top alternatives to Google Analytics for SaaS"></textarea>
+    </div>
+    <div class="row" style="margin-top: 10px;">
+      <button id="saveQuestions" class="ghost">Save questions</button>
+      <button id="run">Run check now</button>
+    </div>
+  </section>
+
+  <!-- 3. Results -->
+  <section class="card">
+    <h2>3 · Visibility</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">Share of voice</div><div class="v" id="tileSov">—</div><div class="d" id="sovDelta"></div></div>
+      <div class="tile"><div class="k">Brand mentions</div><div class="v" id="tileMention">—</div><div class="d">of answers</div></div>
+      <div class="tile"><div class="k">Domain cited</div><div class="v" id="tileCite">—</div><div class="d">of answers</div></div>
+      <div class="tile"><div class="k">Avg rank</div><div class="v" id="tileRank">—</div><div class="d">when shown</div></div>
+    </div>
+
+    <div class="card" style="margin-top: 16px;">
+      <h2>Share of voice over time</h2>
+      <div id="trend"><p class="empty">Run a check to start the trend.</p></div>
+    </div>
+
+    <div class="grid2" style="margin-top: 16px;">
+      <div class="card" style="margin: 0;">
+        <h2>By model (latest run)</h2>
+        <div id="models"><p class="empty">No run yet.</p></div>
+      </div>
+      <div class="card" style="margin: 0;">
+        <h2>You vs competitors (latest run)</h2>
+        <div id="competitorsOut"><p class="empty">No run yet.</p></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="tooltip"></div>
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { apiKey: "", siteId: "", brand: "" };
+
+// --- persistence (per-viewer convenience; safe if storage is blocked) ---
+function save() {
+  try {
+    localStorage.setItem("aiv", JSON.stringify({ apiKey: state.apiKey, siteId: state.siteId, base: $("base").value }));
+  } catch (e) {}
+}
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem("aiv") || "{}");
+    if (s.apiKey) { state.apiKey = s.apiKey; $("apiKey").value = s.apiKey; }
+    if (s.base) $("base").value = s.base;
+    if (s.siteId) state.siteId = s.siteId;
+  } catch (e) {}
+  try {
+    const t = localStorage.getItem("aiv_theme");
+    if (t) document.documentElement.dataset.theme = t;
+  } catch (e) {}
+}
+
+function toast(msg, kind) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "show" + (kind ? " " + kind : "");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => (t.className = ""), 2600);
+}
+
+async function api(method, path, body) {
+  const base = ($("base").value || "").replace(/\/$/, "");
+  const headers = {};
+  if (state.apiKey) headers["authorization"] = "Bearer " + state.apiKey;
+  if (body) headers["content-type"] = "application/json";
+  const res = await fetch(base + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch (e) { data = text; }
+  if (!res.ok) throw new Error((data && data.error) || res.status + " " + res.statusText);
+  return data;
+}
+
+const pct = (n) => Math.round((n || 0) * 100) + "%";
+
+// --- actions ---
+async function createAccount() {
+  const email = $("email").value.trim();
+  if (!email) return toast("Enter an email first", "bad");
+  try {
+    const r = await api("POST", "/v1/users", { email });
+    state.apiKey = r.apiKey;
+    $("apiKey").value = r.apiKey;
+    save();
+    toast("Account created — key saved", "good");
+    await loadSites();
+  } catch (e) { toast(e.message, "bad"); }
+}
+
+async function useKey() {
+  state.apiKey = $("apiKey").value.trim();
+  save();
+  try {
+    const me = await api("GET", "/v1/me");
+    toast("Connected as " + me.email, "good");
+    await loadSites();
+  } catch (e) { toast(e.message, "bad"); }
+}
+
+async function saveOrKey() {
+  const key = $("orKey").value.trim();
+  if (!key) return toast("Enter your OpenRouter key", "bad");
+  try {
+    await api("PUT", "/v1/me/openrouter-key", { key });
+    $("orKey").value = "";
+    toast("OpenRouter key stored (encrypted)", "good");
+  } catch (e) { toast(e.message, "bad"); }
+}
+
+async function loadSites() {
+  if (!state.apiKey) return;
+  try {
+    const sites = await api("GET", "/v1/sites");
+    const sel = $("sites");
+    sel.innerHTML = "";
+    if (!sites.length) {
+      sel.innerHTML = '<option value="">— none yet —</option>';
+    } else {
+      for (const s of sites) {
+        const o = document.createElement("option");
+        o.value = s.id;
+        o.textContent = s.brand + "  ·  " + s.domain;
+        sel.appendChild(o);
+      }
+      const pick = sites.find((s) => String(s.id) === String(state.siteId)) || sites[0];
+      sel.value = pick.id;
+      await selectSite(pick.id);
+    }
+  } catch (e) { toast(e.message, "bad"); }
+}
+
+async function selectSite(id) {
+  state.siteId = id;
+  save();
+  try {
+    const site = await api("GET", "/v1/sites/" + id);
+    state.brand = site.brand;
+    $("questions").value = (site.questions || []).join("\n");
+    await refreshAll();
+  } catch (e) { toast(e.message, "bad"); }
+}
+
+async function addSite() {
+  const brand = $("brand").value.trim();
+  const domain = $("domain").value.trim();
+  if (!brand || !domain) return toast("Brand and domain are required", "bad");
+  const competitors = $("competitors").value.split(",").map((s) => s.trim()).filter(Boolean);
+  try {
+    const site = await api("POST", "/v1/sites", { brand, domain, competitors });
+    toast("Site added", "good");
+    state.siteId = site.id;
+    await loadSites();
+  } catch (e) { toast(e.message, "bad"); }
+}
+
+async function saveQuestions() {
+  if (!state.siteId) return toast("Pick or add a site first", "bad");
+  const questions = $("questions").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  try {
+    const r = await api("POST", "/v1/sites/" + state.siteId + "/questions", { questions });
+    toast("Saved " + r.count + " question(s)", "good");
+  } catch (e) { toast(e.message, "bad"); }
+}
+
+async function run() {
+  if (!state.siteId) return toast("Pick or add a site first", "bad");
+  const btn = $("run");
+  btn.disabled = true;
+  btn.textContent = "Running…";
+  try {
+    const r = await api("POST", "/v1/sites/" + state.siteId + "/run");
+    renderTiles(r.summary);
+    renderModels(r.summary.perModel);
+    renderCompetitors(r.summary);
+    await refreshAll();
+    toast("Run complete", "good");
+  } catch (e) { toast(e.message, "bad"); }
+  btn.disabled = false;
+  btn.textContent = "Run check now";
+}
+
+async function refreshAll() {
+  if (!state.siteId) return;
+  try {
+    const vis = await api("GET", "/v1/sites/" + state.siteId + "/visibility");
+    renderTiles(vis.latest);
+    renderTrend(vis.trend || []);
+  } catch (e) { toast(e.message, "bad"); }
+}
+
+// --- rendering ---
+function renderTiles(s) {
+  $("tileSov").textContent = s ? pct(s.shareOfVoice) : "—";
+  $("tileMention").textContent = s ? pct(s.brandMentionRate) : "—";
+  $("tileCite").textContent = s ? pct(s.domainCiteRate) : "—";
+  $("tileRank").textContent = s && s.avgRank != null ? "#" + s.avgRank.toFixed(1) : "—";
+}
+
+function renderTrend(trend) {
+  const el = $("trend");
+  if (!trend.length) { el.innerHTML = '<p class="empty">Run a check to start the trend.</p>'; return; }
+
+  // delta since first run
+  const first = trend[0].shareOfVoice, last = trend[trend.length - 1].shareOfVoice;
+  const dpp = Math.round((last - first) * 100);
+  const d = $("sovDelta");
+  if (trend.length >= 2 && dpp !== 0) {
+    d.textContent = (dpp > 0 ? "▲ +" : "▼ ") + dpp + "pp";
+    d.className = "d " + (dpp > 0 ? "up" : "down");
+  } else { d.textContent = ""; d.className = "d"; }
+
+  const W = 680, H = 240, padL = 36, padR = 16, padT = 14, padB = 34;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const n = trend.length;
+  const x = (i) => (n <= 1 ? padL + iw / 2 : padL + (i / (n - 1)) * iw);
+  const y = (v) => padT + (1 - v) * ih;
+
+  let grid = "", ticks = "";
+  for (let g = 0; g <= 4; g++) {
+    const gy = padT + (g / 4) * ih;
+    grid += `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="var(--grid)" stroke-width="1"/>`;
+    ticks += `<text x="${padL - 6}" y="${gy + 4}" text-anchor="end">${100 - g * 25}%</text>`;
+  }
+  const pts = trend.map((r, i) => [x(i), y(r.shareOfVoice)]);
+  const path = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  let dots = "";
+  trend.forEach((r, i) => {
+    const when = new Date(r.createdAt).toLocaleString();
+    dots += `<circle cx="${pts[i][0].toFixed(1)}" cy="${pts[i][1].toFixed(1)}" r="4.5" fill="var(--series)"
+      stroke="var(--surface)" stroke-width="2" data-tip="${when} — ${pct(r.shareOfVoice)}"/>`;
+  });
+
+  el.innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Share of voice over time">
+       ${grid}${ticks}
+       <path d="${path}" fill="none" stroke="var(--series)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+       ${dots}
+     </svg>`;
+
+  // hover tooltip
+  const tip = $("tooltip");
+  el.querySelectorAll("circle").forEach((c) => {
+    c.addEventListener("mousemove", (ev) => {
+      tip.textContent = c.getAttribute("data-tip");
+      tip.style.left = ev.clientX + 12 + "px";
+      tip.style.top = ev.clientY + 12 + "px";
+      tip.style.opacity = "1";
+    });
+    c.addEventListener("mouseleave", () => (tip.style.opacity = "0"));
+  });
+}
+
+function renderModels(perModel) {
+  const el = $("models");
+  const rows = Object.entries(perModel || {});
+  if (!rows.length) { el.innerHTML = '<p class="empty">No run yet.</p>'; return; }
+  el.innerHTML =
+    `<table><thead><tr><th>Model</th><th class="num">Mentioned</th><th class="num">Cited</th></tr></thead><tbody>` +
+    rows.map(([m, v]) => `<tr><td>${m}</td><td class="num">${pct(v.mentionRate)}</td><td class="num">${pct(v.citeRate)}</td></tr>`).join("") +
+    `</tbody></table>`;
+}
+
+function renderCompetitors(s) {
+  const el = $("competitorsOut");
+  const yourCount = Math.round((s.brandMentionRate || 0) * (s.totalAnswers || 0));
+  const entries = [{ name: state.brand || "You", count: yourCount, you: true }]
+    .concat(Object.entries(s.competitorMentions || {}).map(([name, count]) => ({ name, count, you: false })))
+    .sort((a, b) => b.count - a.count);
+  const max = Math.max(1, ...entries.map((e) => e.count));
+  el.innerHTML = entries.map((e) =>
+    `<div class="bar-row">
+       <span class="name" title="${e.name}">${e.name}${e.you ? " (you)" : ""}</span>
+       <span class="bar-track"><span class="bar-fill ${e.you ? "you" : ""}" style="width:${(e.count / max) * 100}%"></span></span>
+       <span class="val">${e.count}</span>
+     </div>`).join("");
+}
+
+// --- wiring ---
+$("createAccount").onclick = createAccount;
+$("useKey").onclick = useKey;
+$("saveOrKey").onclick = saveOrKey;
+$("reloadSites").onclick = loadSites;
+$("addSite").onclick = addSite;
+$("saveQuestions").onclick = saveQuestions;
+$("run").onclick = run;
+$("sites").onchange = (e) => e.target.value && selectSite(e.target.value);
+$("base").onchange = save;
+$("themeToggle").onclick = () => {
+  const cur = document.documentElement.dataset.theme;
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("aiv_theme", next); } catch (e) {}
+};
+
+load();
+if (state.apiKey) loadSites();
+</script>
+</body>
+</html>
