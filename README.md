@@ -95,6 +95,7 @@ never ships with a key and never pays for your tokens.
 | `POST /v1/users` | Create account → returns your API key |
 | `GET /v1/me` | Account info |
 | `PUT /v1/me/openrouter-key` | Store your OpenRouter key |
+| `PUT /v1/me/alert-webhook` | Store a Slack/Discord webhook for drop alerts |
 | `POST /v1/sites` | Add a site (brand, domain, competitors, models) |
 | `GET /v1/sites` | List your sites |
 | `GET /v1/sites/:id` | One site + its questions |
@@ -145,6 +146,11 @@ curl -s -X POST localhost:8787/v1/sites/1/run -H "authorization: Bearer $KEY"
 > Model slugs change over time — check https://openrouter.ai/models for current ones.
 > `grounding: "online"` is the actionable mode (live web). `"none"` measures a model's
 > training-data memory only.
+
+**Abuse protection & alerts:** signups are limited to 5 per IP per hour and runs to
+60 per account per hour (fixed-window counters in the DB). Set a Slack/Discord webhook
+via `PUT /v1/me/alert-webhook` (or in the dashboard) to get a message whenever a site's
+share of voice drops 10+ points between runs. Stored webhooks are encrypted at rest.
 
 ## Dashboard
 
@@ -237,6 +243,6 @@ public/
   encrypted at rest.
 
 The four phases are complete — a working engine, history, a multi-tenant API, and a
-deployable serverless backend — plus a web dashboard on top. Natural next steps if
-you take it further: email/Slack alerts when share-of-voice drops, per-question
-drill-downs, and rate limiting.
+deployable serverless backend — plus a web dashboard, rate limiting, and drop alerts.
+Natural next steps if you take it further: per-question drill-downs, multiple API keys
+per account, and team/workspace support.

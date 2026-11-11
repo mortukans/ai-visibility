@@ -1,3 +1,4 @@
+import { maybeAlert } from "../alerts.js";
 import type { ModelConfig, SiteConfig } from "../engine/types.js";
 import { runChecks } from "../engine/run.js";
 import { summarize } from "../engine/visibility.js";
@@ -19,6 +20,29 @@ async function requireOwnedSite(c: Ctx): Promise<StoredSite> {
   return site;
 }
 
+/** Best-effort client IP, used as a rate-limit key. */
+function clientIp(c: Ctx): string {
+  return (
+    c.req.headers.get("cf-connecting-ip") ||
+    c.req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "local"
+  );
+}
+
+/** Fixed-window rate limit; throws 429 when the bucket is over its limit. */
+async function enforceLimit(
+  c: Ctx,
+  bucket: string,
+  limit: number,
+  windowSec: number,
+): Promise<void> {
+  const r = await c.store.hitRateLimit(bucket, limit, windowSec);
+  if (!r.ok) {
+    const retry = Math.max(0, r.resetAt - Math.floor(Date.now() / 1000));
+    throw new HttpError(429, `rate limit exceeded — retry in ${retry}s`);
+  }
+}
+
 /**
  * Build the API as a single Fetch handler: (Request) => Response.
  * Runs behind the Node dev server now and inside a Cloudflare Worker later.
@@ -31,6 +55,7 @@ export function createApp(store: Store): (req: Request) => Promise<Response> {
   // --- Account & BYOK key ---
 
   r.post("/v1/users", async (c) => {
+    await enforceLimit(c, "signup:" + clientIp(c), 5, 3600); // 5 new accounts / IP / hour
     const b = await readJson<{ email?: string }>(c);
     if (!b.email) throw new HttpError(400, "email required");
     try {
@@ -49,7 +74,12 @@ export function createApp(store: Store): (req: Request) => Promise<Response> {
     "/v1/me",
     auth(async (c) => {
       const u = c.user!;
-      return json({ id: u.id, email: u.email, openrouterKeySet: u.openrouterKey !== null });
+      return json({
+        id: u.id,
+        email: u.email,
+        openrouterKeySet: u.openrouterKey !== null,
+        alertWebhookSet: u.alertWebhook !== null,
+      });
     }),
   );
 
@@ -59,6 +89,15 @@ export function createApp(store: Store): (req: Request) => Promise<Response> {
       const b = await readJson<{ key?: string | null }>(c);
       await store.setOpenrouterKey(c.user!.id, b.key ?? null);
       return json({ openrouterKeySet: !!b.key });
+    }),
+  );
+
+  r.put(
+    "/v1/me/alert-webhook",
+    auth(async (c) => {
+      const b = await readJson<{ url?: string | null }>(c);
+      await store.setAlertWebhook(c.user!.id, b.url ?? null);
+      return json({ alertWebhookSet: !!b.url });
     }),
   );
 
@@ -115,6 +154,7 @@ export function createApp(store: Store): (req: Request) => Promise<Response> {
     "/v1/sites/:id/run",
     auth(async (c) => {
       const site = await requireOwnedSite(c);
+      await enforceLimit(c, "run:" + c.user!.id, 60, 3600); // 60 runs / user / hour
 
       // Body is optional; it may carry a one-off OpenRouter key.
       let b: { openrouterKey?: string } = {};
@@ -149,6 +189,7 @@ export function createApp(store: Store): (req: Request) => Promise<Response> {
       const results = await runChecks(key, config, questions);
       const summary = summarize(results, config);
       const runId = await store.saveRun(site.id, summary, results);
+      await maybeAlert(store, c.user!, site).catch(() => {});
       return json({ runId, summary });
     }),
   );

@@ -1,6 +1,6 @@
 {
   "name": "ai-visibility",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Check whether your site gets mentioned and cited by AI models (web-grounded), across many models, via OpenRouter. BYOK.",

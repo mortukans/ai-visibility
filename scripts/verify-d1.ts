@@ -124,6 +124,22 @@ async function main() {
 
   assert("listAllSites sees the site", (await store.listAllSites()).some((s) => s.id === siteId));
 
+  // alert webhook round-trips and is encrypted at rest
+  const hook = "https://hooks.slack.com/services/XXX/YYY/ZZZ";
+  await store.setAlertWebhook(id, hook);
+  assert("alert webhook decrypts back", (await store.getUser(id))?.alertWebhook === hook);
+  const rawHook = sdb.prepare("SELECT alert_webhook FROM users WHERE id = ?").get(id) as {
+    alert_webhook: string;
+  };
+  assert("webhook encrypted at rest", rawHook.alert_webhook !== hook);
+
+  // rate limiting: a 3rd hit against a limit of 2 is blocked
+  const rl1 = await store.hitRateLimit("test:bucket", 2, 60);
+  const rl2 = await store.hitRateLimit("test:bucket", 2, 60);
+  const rl3 = await store.hitRateLimit("test:bucket", 2, 60);
+  assert("rate limit allows up to the limit", rl1.ok && rl2.ok);
+  assert("rate limit blocks over the limit", !rl3.ok);
+
   console.log(failures === 0 ? "\nD1 store: all checks passed\n" : `\n${failures} check(s) FAILED\n`);
   process.exit(failures === 0 ? 0 : 1);
 }

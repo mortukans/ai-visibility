@@ -176,6 +176,13 @@
       </div>
       <button id="saveOrKey" class="ghost">Save key</button>
     </div>
+    <div class="row" style="margin-top: 12px;">
+      <div class="field" style="flex: 2 1 220px;">
+        <label for="alertWebhook">Drop-alert webhook (Slack/Discord) — optional</label>
+        <input id="alertWebhook" type="password" placeholder="https://hooks.slack.com/… (alert when share of voice drops)" />
+      </div>
+      <button id="saveWebhook" class="ghost">Save webhook</button>
+    </div>
     <p class="hint">Keys never leave your account. Run the API with <code>npm run api</code>, or point the base URL at your deployed Worker.</p>
   </section>
 
@@ -313,6 +320,15 @@ async function saveOrKey() {
     await api("PUT", "/v1/me/openrouter-key", { key });
     $("orKey").value = "";
     toast("OpenRouter key stored (encrypted)", "good");
+  } catch (e) { toast(e.message, "bad"); }
+}
+
+async function saveWebhook() {
+  const url = $("alertWebhook").value.trim();
+  try {
+    await api("PUT", "/v1/me/alert-webhook", { url });
+    $("alertWebhook").value = "";
+    toast(url ? "Alert webhook saved (encrypted)" : "Alert webhook cleared", "good");
   } catch (e) { toast(e.message, "bad"); }
 }
 
@@ -488,6 +504,7 @@ function renderCompetitors(s) {
 $("createAccount").onclick = createAccount;
 $("useKey").onclick = useKey;
 $("saveOrKey").onclick = saveOrKey;
+$("saveWebhook").onclick = saveWebhook;
 $("reloadSites").onclick = loadSites;
 $("addSite").onclick = addSite;
 $("saveQuestions").onclick = saveQuestions;

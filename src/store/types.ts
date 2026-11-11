@@ -11,11 +11,19 @@ export interface RunSummaryRow {
   avgRank: number | null;
 }
 
+export interface RateResult {
+  ok: boolean;
+  remaining: number;
+  resetAt: number; // unix seconds when the window resets
+}
+
 export interface User {
   id: number;
   email: string;
   /** The user's own OpenRouter key (BYOK), or null if not set yet. */
   openrouterKey: string | null;
+  /** Webhook URL (Slack/Discord/generic) for drop alerts, or null. */
+  alertWebhook: string | null;
 }
 
 /** Everything needed to create or update a site. */
@@ -46,6 +54,7 @@ export interface Store {
   getUserByApiKey(apiKey: string): Promise<User | null>;
   getUser(id: number): Promise<User | null>;
   setOpenrouterKey(userId: number, key: string | null): Promise<void>;
+  setAlertWebhook(userId: number, url: string | null): Promise<void>;
   /** Get-or-create the default local user used by the CLI. */
   ensureLocalUser(): Promise<number>;
 
@@ -64,6 +73,9 @@ export interface Store {
   // Runs
   saveRun(siteId: number, summary: VisibilitySummary, results: MentionResult[]): Promise<number>;
   listRuns(siteId: number, limit?: number): Promise<RunSummaryRow[]>;
+
+  // Rate limiting (fixed window, keyed by an arbitrary bucket string)
+  hitRateLimit(bucket: string, limit: number, windowSec: number): Promise<RateResult>;
 
   close(): Promise<void>;
 }

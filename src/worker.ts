@@ -1,4 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import { maybeAlert } from "./alerts.js";
 import { createApp } from "./api/app.js";
 import type { SiteConfig } from "./engine/types.js";
 import { runChecks } from "./engine/run.js";
@@ -45,6 +46,7 @@ export default {
       const results = await runChecks(key, config, questions);
       const summary = summarize(results, config);
       await store.saveRun(site.id, summary, results);
+      await maybeAlert(store, user!, site).catch(() => {});
     }
   },
 };

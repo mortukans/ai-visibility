@@ -7,6 +7,7 @@ export const SCHEMA: string[] = [
      id             INTEGER PRIMARY KEY,
      email          TEXT NOT NULL UNIQUE,
      openrouter_key TEXT,
+     alert_webhook  TEXT,
      created_at     TEXT NOT NULL
    )`,
   `CREATE TABLE IF NOT EXISTS api_keys (
@@ -59,4 +60,9 @@ export const SCHEMA: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_questions_site ON questions(site_id)`,
   `CREATE INDEX IF NOT EXISTS idx_runs_site ON runs(site_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_mentions_run ON mentions(run_id)`,
+  `CREATE TABLE IF NOT EXISTS rate_limits (
+     bucket   TEXT PRIMARY KEY,
+     count    INTEGER NOT NULL,
+     reset_at INTEGER NOT NULL
+   )`,
 ];

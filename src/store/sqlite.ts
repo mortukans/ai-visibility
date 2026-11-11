@@ -4,7 +4,7 @@ import type { Cipher } from "../util/crypto.js";
 import { generateApiKey, hashKey } from "../util/keys.js";
 import { reveal, type Row, toRunSummary, toSite } from "./mappers.js";
 import { SCHEMA } from "./schema.js";
-import type { RunSummaryRow, SiteInput, Store, StoredSite, User } from "./types.js";
+import type { RateResult, RunSummaryRow, SiteInput, Store, StoredSite, User } from "./types.js";
 
 const LOCAL_EMAIL = "local@localhost";
 
@@ -22,6 +22,12 @@ export class SqliteStore implements Store {
   async init(): Promise<void> {
     this.db.exec("PRAGMA foreign_keys = ON;");
     for (const statement of SCHEMA) this.db.exec(statement);
+    // Additive migration for local DBs created before the alert_webhook column.
+    try {
+      this.db.exec("ALTER TABLE users ADD COLUMN alert_webhook TEXT");
+    } catch {
+      /* column already exists */
+    }
   }
 
   // --- Users & auth ---
@@ -42,7 +48,7 @@ export class SqliteStore implements Store {
   async getUserByApiKey(apiKey: string): Promise<User | null> {
     const row = this.db
       .prepare(
-        `SELECT u.id, u.email, u.openrouter_key
+        `SELECT u.id, u.email, u.openrouter_key, u.alert_webhook
            FROM api_keys k JOIN users u ON u.id = k.user_id
           WHERE k.key_hash = ?`,
       )
@@ -52,7 +58,7 @@ export class SqliteStore implements Store {
 
   async getUser(id: number): Promise<User | null> {
     const row = this.db
-      .prepare("SELECT id, email, openrouter_key FROM users WHERE id = ?")
+      .prepare("SELECT id, email, openrouter_key, alert_webhook FROM users WHERE id = ?")
       .get(id) as Row | undefined;
     return row ? this.toUser(row) : null;
   }
@@ -60,6 +66,11 @@ export class SqliteStore implements Store {
   async setOpenrouterKey(userId: number, key: string | null): Promise<void> {
     const stored = key && this.cipher ? await this.cipher.encrypt(key) : key;
     this.db.prepare("UPDATE users SET openrouter_key = ? WHERE id = ?").run(stored, userId);
+  }
+
+  async setAlertWebhook(userId: number, url: string | null): Promise<void> {
+    const stored = url && this.cipher ? await this.cipher.encrypt(url) : url;
+    this.db.prepare("UPDATE users SET alert_webhook = ? WHERE id = ?").run(stored, userId);
   }
 
   async ensureLocalUser(): Promise<number> {
@@ -75,6 +86,7 @@ export class SqliteStore implements Store {
       id: Number(row.id),
       email: String(row.email),
       openrouterKey: await reveal(this.cipher, row.openrouter_key),
+      alertWebhook: await reveal(this.cipher, row.alert_webhook),
     };
   }
 
@@ -215,6 +227,26 @@ export class SqliteStore implements Store {
       )
       .all(siteId, limit) as Row[];
     return rows.map(toRunSummary);
+  }
+
+  async hitRateLimit(bucket: string, limit: number, windowSec: number): Promise<RateResult> {
+    const now = Math.floor(Date.now() / 1000);
+    const row = this.db
+      .prepare("SELECT count, reset_at FROM rate_limits WHERE bucket = ?")
+      .get(bucket) as Row | undefined;
+    if (!row || Number(row.reset_at) <= now) {
+      const resetAt = now + windowSec;
+      this.db
+        .prepare(
+          `INSERT INTO rate_limits (bucket, count, reset_at) VALUES (?, 1, ?)
+           ON CONFLICT(bucket) DO UPDATE SET count = 1, reset_at = excluded.reset_at`,
+        )
+        .run(bucket, resetAt);
+      return { ok: true, remaining: limit - 1, resetAt };
+    }
+    const count = Number(row.count) + 1;
+    this.db.prepare("UPDATE rate_limits SET count = ? WHERE bucket = ?").run(count, bucket);
+    return { ok: count <= limit, remaining: Math.max(0, limit - count), resetAt: Number(row.reset_at) };
   }
 
   async close(): Promise<void> {
